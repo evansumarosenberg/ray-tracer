@@ -276,8 +276,10 @@ Ray getRay(vec2 pixel, inout uint state) {
 
 void main() {
   ivec2 pixelCoord = ivec2(gl_FragCoord.xy);
-  vec2 pixel = clamp(vec2(pixelCoord), vec2(0.0), uResolution - vec2(1.0));
-  uint seed = hashSeed(uvec3(uint(pixelCoord.x), uint(pixelCoord.y), uint(uFrameIndex + 1)));
+  float imageY = uResolution.y - 1.0 - float(pixelCoord.y);
+  vec2 pixel = vec2(float(pixelCoord.x), imageY);
+  pixel = clamp(pixel, vec2(0.0), uResolution - vec2(1.0));
+  uint seed = hashSeed(uvec3(uint(pixel.x), uint(pixel.y), uint(uFrameIndex + 1)));
   Ray ray = getRay(pixel, seed);
   vec3 sampleColor = rayColor(ray, seed);
   vec3 previousAccumulation = texelFetch(uPreviousAccumulation, pixelCoord, 0).rgb;

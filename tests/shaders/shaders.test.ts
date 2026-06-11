@@ -40,6 +40,11 @@ describe('shader sources', () => {
     expect(pathTraceFragmentShader).toContain(`i < ${MAX_SHADER_SPHERES}`);
   });
 
+  it('maps WebGL bottom-left fragment coordinates to book top-left image rows', () => {
+    expect(pathTraceFragmentShader).toContain('float imageY = uResolution.y - 1.0 - float(pixelCoord.y)');
+    expect(pathTraceFragmentShader).toContain('vec2 pixel = vec2(float(pixelCoord.x), imageY)');
+  });
+
   it('exports a display shader that averages and gamma corrects accumulation', () => {
     expect(displayFragmentShader).toContain('#version 300 es');
     expect(displayFragmentShader).toContain('uniform sampler2D uAccumulation');
