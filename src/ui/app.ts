@@ -9,7 +9,6 @@ import { downloadCanvasPng } from './exportPng';
 interface AppState {
   preset: RenderPreset;
   resolutionScale: number;
-  maxDepth: number;
   paused: boolean;
 }
 
@@ -57,7 +56,6 @@ export function mountApp(root: HTMLElement): () => void {
   const state: AppState = {
     preset: RENDER_PRESETS[0],
     resolutionScale: 1,
-    maxDepth: RENDER_PRESETS[0].maxDepth,
     paused: false,
   };
   let renderer: ProgressiveRenderer | null = null;
@@ -74,7 +72,7 @@ export function mountApp(root: HTMLElement): () => void {
 
   presetSelect.value = state.preset.id;
   resolutionInput.value = String(state.resolutionScale);
-  maxDepthInput.value = String(state.maxDepth);
+  maxDepthInput.value = String(state.preset.maxDepth);
 
   const gl = canvas.getContext('webgl2', { preserveDrawingBuffer: true });
   const capabilities = checkWebGlCapabilities(createWebGlCapabilityAdapter(gl));
@@ -96,9 +94,12 @@ export function mountApp(root: HTMLElement): () => void {
   }
 
   const webGl = gl;
-  packedScene = packSceneForGpu(createFinalScene());
 
   function recreateRenderer(): void {
+    if (!packedScene) {
+      return;
+    }
+
     const previousRenderer = renderer;
     renderer = null;
     previousRenderer?.dispose();
@@ -111,7 +112,6 @@ export function mountApp(root: HTMLElement): () => void {
       const renderSize = computeRenderSize(settings.imageWidth, settings.aspectRatio, settings.resolutionScale);
       canvas.width = renderSize.width;
       canvas.height = renderSize.height;
-      state.maxDepth = settings.maxDepth;
       maxDepthInput.value = String(settings.maxDepth);
       renderer = new ProgressiveRenderer({
         canvas,
@@ -136,8 +136,30 @@ export function mountApp(root: HTMLElement): () => void {
     }
 
     if (renderer) {
-      const stats = state.paused ? renderer.stats() : renderer.renderFrame();
-      status.textContent = `${stats.sampleCount} / ${stats.targetSamples} samples`;
+      try {
+        const stats = state.paused ? renderer.stats() : renderer.renderFrame();
+        status.textContent = `${stats.sampleCount} / ${stats.targetSamples} samples`;
+      } catch (error) {
+        status.textContent = renderErrorMessage(error);
+        renderer.dispose();
+        renderer = null;
+      }
+    }
+
+    animationFrameId = requestAnimationFrame(renderLoop);
+  }
+
+  function initializeRenderer(): void {
+    if (disposed) {
+      return;
+    }
+
+    try {
+      packedScene = packSceneForGpu(createFinalScene());
+      recreateRenderer();
+    } catch (error) {
+      status.textContent = renderErrorMessage(error);
+      renderer = null;
     }
 
     animationFrameId = requestAnimationFrame(renderLoop);
@@ -151,7 +173,6 @@ export function mountApp(root: HTMLElement): () => void {
     }
 
     state.preset = nextPreset;
-    state.maxDepth = nextPreset.maxDepth;
     maxDepthInput.value = String(nextPreset.maxDepth);
     recreateRenderer();
   });
@@ -178,8 +199,7 @@ export function mountApp(root: HTMLElement): () => void {
     downloadCanvasPng(canvas);
   });
 
-  recreateRenderer();
-  animationFrameId = requestAnimationFrame(renderLoop);
+  animationFrameId = requestAnimationFrame(initializeRenderer);
 
   return () => {
     disposed = true;
