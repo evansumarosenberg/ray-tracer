@@ -7,6 +7,8 @@ import { packSceneForGpu, type PackedScene } from '../scene/gpuPacking';
 import { downloadCanvasPng } from './exportPng';
 
 const STARTUP_RENDER_DELAY_MS = 250;
+const FIRST_RENDER_OBSERVABILITY_DELAY_MS = 2_000;
+const PROGRESSIVE_SAMPLE_DELAY_MS = 50;
 
 interface AppState {
   preset: RenderPreset;
@@ -55,6 +57,7 @@ export function mountApp(root: HTMLElement): () => void {
   const resetButton = requireElement<HTMLButtonElement>(root, '#reset-render');
   const exportButton = requireElement<HTMLButtonElement>(root, '#export-png');
   const controls = [presetSelect, resolutionInput, maxDepthInput, pauseToggle, resetButton, exportButton];
+  canvas.dataset.rendered = 'false';
   const state: AppState = {
     preset: RENDER_PRESETS[0],
     resolutionScale: 1,
@@ -65,6 +68,7 @@ export function mountApp(root: HTMLElement): () => void {
   let webGl: WebGL2RenderingContext | null = null;
   let animationFrameId = 0;
   let initializationTimeoutId = 0;
+  let renderLoopTimeoutId = 0;
   let disposed = false;
 
   for (const preset of RENDER_PRESETS) {
@@ -85,6 +89,7 @@ export function mountApp(root: HTMLElement): () => void {
 
     const previousRenderer = renderer;
     renderer = null;
+    canvas.dataset.rendered = 'false';
     previousRenderer?.dispose();
 
     try {
@@ -118,15 +123,40 @@ export function mountApp(root: HTMLElement): () => void {
       return;
     }
 
+    let nextRenderDelayMs = 0;
+
     if (renderer) {
       try {
         const stats = state.paused ? renderer.stats() : renderer.renderFrame();
+        if (!state.paused) {
+          canvas.dataset.rendered = stats.sampleCount > 0 ? 'true' : 'false';
+          nextRenderDelayMs =
+            stats.sampleCount === 1 ? FIRST_RENDER_OBSERVABILITY_DELAY_MS : PROGRESSIVE_SAMPLE_DELAY_MS;
+        }
         status.textContent = `${stats.sampleCount} / ${stats.targetSamples} samples`;
       } catch (error) {
         status.textContent = renderErrorMessage(error);
+        canvas.dataset.rendered = 'false';
         renderer.dispose();
         renderer = null;
       }
+    }
+
+    scheduleRenderLoop(nextRenderDelayMs);
+  }
+
+  function scheduleRenderLoop(delayMs: number): void {
+    if (disposed) {
+      return;
+    }
+
+    if (delayMs > 0) {
+      // Leave a small browser task gap between expensive progressive samples.
+      renderLoopTimeoutId = window.setTimeout(() => {
+        renderLoopTimeoutId = 0;
+        animationFrameId = requestAnimationFrame(renderLoop);
+      }, delayMs);
+      return;
     }
 
     animationFrameId = requestAnimationFrame(renderLoop);
@@ -163,7 +193,7 @@ export function mountApp(root: HTMLElement): () => void {
       renderer = null;
     }
 
-    animationFrameId = requestAnimationFrame(renderLoop);
+    scheduleRenderLoop(0);
   }
 
   function scheduleInitializationAfterPaint(): void {
@@ -217,6 +247,10 @@ export function mountApp(root: HTMLElement): () => void {
     if (initializationTimeoutId !== 0) {
       clearTimeout(initializationTimeoutId);
       initializationTimeoutId = 0;
+    }
+    if (renderLoopTimeoutId !== 0) {
+      clearTimeout(renderLoopTimeoutId);
+      renderLoopTimeoutId = 0;
     }
     renderer?.dispose();
     renderer = null;

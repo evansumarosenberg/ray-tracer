@@ -259,6 +259,29 @@ describe('mountApp', () => {
     expect(statusText()).toBe('0 / 10 samples');
   });
 
+  it('marks the canvas rendered only after a successful non-paused render frame', () => {
+    mountApp(root);
+    runStartup();
+
+    expect(canvas().dataset.rendered).toBe('false');
+
+    click('#pause-toggle');
+    runNextFrame();
+
+    expect(canvas().dataset.rendered).toBe('false');
+
+    click('#pause-toggle');
+    runNextFrame();
+
+    expect(canvas().dataset.rendered).toBe('true');
+    expect(setTimeoutMock).toHaveBeenLastCalledWith(expect.any(Function), 2000);
+
+    runNextTimeout();
+    runNextFrame();
+
+    expect(setTimeoutMock).toHaveBeenLastCalledWith(expect.any(Function), 50);
+  });
+
   function runStartup(): void {
     runNextFrame();
     runNextTimeout();
@@ -296,6 +319,10 @@ describe('mountApp', () => {
 
   function statusText(): string {
     return root.querySelector<HTMLElement>('[data-testid="status"]')?.textContent ?? '';
+  }
+
+  function canvas(): HTMLCanvasElement {
+    return root.querySelector<HTMLCanvasElement>('#render-canvas')!;
   }
 
   function disabledControlIds(): string[] {
