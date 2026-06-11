@@ -7,16 +7,16 @@ export enum MaterialType {
 }
 
 export type Material =
-  | { type: MaterialType.Lambertian; albedo: Vec3 }
-  | { type: MaterialType.Metal; albedo: Vec3; fuzz: number }
-  | { type: MaterialType.Dielectric; refractionIndex: number };
+  | { readonly type: MaterialType.Lambertian; readonly albedo: Vec3 }
+  | { readonly type: MaterialType.Metal; readonly albedo: Vec3; readonly fuzz: number }
+  | { readonly type: MaterialType.Dielectric; readonly refractionIndex: number };
 
 export interface Sphere {
-  center: Vec3;
-  radius: number;
-  material: Material;
+  readonly center: Vec3;
+  readonly radius: number;
+  readonly material: Material;
 }
 
 export interface Scene {
-  spheres: Sphere[];
+  readonly spheres: readonly Sphere[];
 }

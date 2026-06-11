@@ -34,9 +34,54 @@ describe('createFinalScene', () => {
     const smallSpheres = createFinalScene().spheres.filter((sphere) => sphere.radius === 0.2);
 
     for (const sphere of smallSpheres) {
+      expect(sphere.center[1]).toBe(0.2);
       const dx = sphere.center[0] - 4;
       const dz = sphere.center[2] - 0;
       expect(Math.sqrt(dx * dx + dz * dz)).toBeGreaterThan(0.9);
+
+      if (sphere.material.type === MaterialType.Lambertian || sphere.material.type === MaterialType.Metal) {
+        for (const channel of sphere.material.albedo) {
+          expect(channel).toBeGreaterThanOrEqual(0);
+          expect(channel).toBeLessThanOrEqual(1);
+        }
+      }
+
+      if (sphere.material.type === MaterialType.Metal) {
+        expect(sphere.material.fuzz).toBeGreaterThanOrEqual(0);
+        expect(sphere.material.fuzz).toBeLessThan(0.5);
+      }
+
+      if (sphere.material.type === MaterialType.Dielectric) {
+        expect(sphere.material.refractionIndex).toBe(1.5);
+      }
     }
+  });
+
+  it('keeps canonical book spheres in fixed positions', () => {
+    const scene = createFinalScene();
+
+    expect(scene.spheres[0]).toEqual({
+      center: [0, -1000, 0],
+      radius: 1000,
+      material: { type: MaterialType.Lambertian, albedo: [0.5, 0.5, 0.5] },
+    });
+
+    expect(scene.spheres.slice(-3)).toEqual([
+      {
+        center: [0, 1, 0],
+        radius: 1,
+        material: { type: MaterialType.Dielectric, refractionIndex: 1.5 },
+      },
+      {
+        center: [-4, 1, 0],
+        radius: 1,
+        material: { type: MaterialType.Lambertian, albedo: [0.4, 0.2, 0.1] },
+      },
+      {
+        center: [4, 1, 0],
+        radius: 1,
+        material: { type: MaterialType.Metal, albedo: [0.7, 0.6, 0.5], fuzz: 0 },
+      },
+    ]);
   });
 });
