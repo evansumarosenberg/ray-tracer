@@ -6,6 +6,7 @@ export const SPHERE_CENTER_Y_OFFSET = 1;
 export const SPHERE_CENTER_Z_OFFSET = 2;
 export const SPHERE_RADIUS_OFFSET = 3;
 
+// Materials occupy two vec4 slots: [type, albedo.r, albedo.g, albedo.b] and [fuzz, refractionIndex, reserved, reserved].
 export const MATERIAL_FLOAT_STRIDE = 8;
 export const MATERIAL_TYPE_OFFSET = 0;
 export const MATERIAL_ALBEDO_R_OFFSET = 1;
@@ -34,20 +35,29 @@ export function packSceneForGpu(scene: Scene): PackedScene {
     const materialOffset = index * MATERIAL_FLOAT_STRIDE;
     materials[materialOffset + MATERIAL_TYPE_OFFSET] = sphere.material.type;
 
-    if (sphere.material.type === MaterialType.Lambertian || sphere.material.type === MaterialType.Metal) {
-      materials[materialOffset + MATERIAL_ALBEDO_R_OFFSET] = sphere.material.albedo[0];
-      materials[materialOffset + MATERIAL_ALBEDO_G_OFFSET] = sphere.material.albedo[1];
-      materials[materialOffset + MATERIAL_ALBEDO_B_OFFSET] = sphere.material.albedo[2];
-    }
-
-    if (sphere.material.type === MaterialType.Metal) {
-      materials[materialOffset + MATERIAL_FUZZ_OFFSET] = sphere.material.fuzz;
-    }
-
-    if (sphere.material.type === MaterialType.Dielectric) {
-      materials[materialOffset + MATERIAL_REFRACTION_INDEX_OFFSET] = sphere.material.refractionIndex;
+    switch (sphere.material.type) {
+      case MaterialType.Lambertian:
+        materials[materialOffset + MATERIAL_ALBEDO_R_OFFSET] = sphere.material.albedo[0];
+        materials[materialOffset + MATERIAL_ALBEDO_G_OFFSET] = sphere.material.albedo[1];
+        materials[materialOffset + MATERIAL_ALBEDO_B_OFFSET] = sphere.material.albedo[2];
+        break;
+      case MaterialType.Metal:
+        materials[materialOffset + MATERIAL_ALBEDO_R_OFFSET] = sphere.material.albedo[0];
+        materials[materialOffset + MATERIAL_ALBEDO_G_OFFSET] = sphere.material.albedo[1];
+        materials[materialOffset + MATERIAL_ALBEDO_B_OFFSET] = sphere.material.albedo[2];
+        materials[materialOffset + MATERIAL_FUZZ_OFFSET] = sphere.material.fuzz;
+        break;
+      case MaterialType.Dielectric:
+        materials[materialOffset + MATERIAL_REFRACTION_INDEX_OFFSET] = sphere.material.refractionIndex;
+        break;
+      default:
+        assertNever(sphere.material);
     }
   });
 
   return { sphereCount: scene.spheres.length, spheres, materials };
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unsupported material type: ${JSON.stringify(value)}`);
 }

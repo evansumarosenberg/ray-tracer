@@ -1,6 +1,7 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { createFinalScene } from '../../src/scene/finalScene';
-import { MaterialType } from '../../src/scene/types';
+import { MaterialType, type Scene, type Sphere } from '../../src/scene/types';
 
 describe('createFinalScene', () => {
   it('creates a deterministic final book scene for the fixed seed', () => {
@@ -28,6 +29,36 @@ describe('createFinalScene', () => {
     expect(counts[MaterialType.Lambertian]).toBe(378);
     expect(counts[MaterialType.Metal]).toBe(76);
     expect(counts[MaterialType.Dielectric]).toBe(31);
+  });
+
+  it('matches the fixed seed scene fingerprint', () => {
+    expect(sceneFingerprint(createFinalScene())).toBe(
+      '93c214f0eb3cd298e5b8e47a1582286d4ce442b51900a56716e0254aa3941c34',
+    );
+  });
+
+  it('keeps representative random small sphere sentinels stable', () => {
+    const scene = createFinalScene();
+
+    expect(normalizeSphere(scene.spheres[1])).toEqual({
+      c: [-10.962941, 0.2, -10.44588],
+      r: 0.2,
+      m: MaterialType.Lambertian,
+      a: [0.374497, 0.010881, 0.061879],
+    });
+    expect(normalizeSphere(scene.spheres[3])).toEqual({
+      c: [-10.637889, 0.2, -8.760146],
+      r: 0.2,
+      m: MaterialType.Metal,
+      a: [0.525292, 0.764482, 0.962117],
+      f: 0.037939,
+    });
+    expect(normalizeSphere(scene.spheres[7])).toEqual({
+      c: [-10.315622, 0.2, -4.74415],
+      r: 0.2,
+      m: MaterialType.Dielectric,
+      ri: 1.5,
+    });
   });
 
   it('keeps random small spheres outside the book exclusion zone', () => {
@@ -85,3 +116,42 @@ describe('createFinalScene', () => {
     ]);
   });
 });
+
+interface NormalizedSphere {
+  c: number[];
+  r: number;
+  m: MaterialType;
+  a?: number[];
+  f?: number;
+  ri?: number;
+}
+
+function sceneFingerprint(scene: Scene): string {
+  return createHash('sha256').update(JSON.stringify(scene.spheres.map(normalizeSphere))).digest('hex');
+}
+
+function normalizeSphere(sphere: Sphere): NormalizedSphere {
+  const normalized: NormalizedSphere = {
+    c: sphere.center.map(round6),
+    r: round6(sphere.radius),
+    m: sphere.material.type,
+  };
+
+  if ('albedo' in sphere.material) {
+    normalized.a = sphere.material.albedo.map(round6);
+  }
+
+  if ('fuzz' in sphere.material) {
+    normalized.f = round6(sphere.material.fuzz);
+  }
+
+  if ('refractionIndex' in sphere.material) {
+    normalized.ri = round6(sphere.material.refractionIndex);
+  }
+
+  return normalized;
+}
+
+function round6(value: number): number {
+  return Number(value.toFixed(6));
+}
