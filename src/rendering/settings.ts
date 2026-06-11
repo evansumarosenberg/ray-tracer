@@ -3,6 +3,13 @@ import type { RenderPreset } from '../presets/renderPresets';
 export const MIN_RESOLUTION_SCALE = 0.1;
 export const MAX_RESOLUTION_SCALE = 1;
 export const MAX_RENDER_DIMENSION = 16_384;
+export const MAX_SAMPLES_PER_PIXEL = 500;
+export const MAX_MAX_DEPTH = 50;
+
+export interface RenderSize {
+  width: number;
+  height: number;
+}
 
 export interface RenderSettings {
   presetId: RenderPreset['id'];
@@ -14,8 +21,8 @@ export interface RenderSettings {
   paused: boolean;
 }
 
-export function computeRenderSize(imageWidth: number, aspectRatio: number, resolutionScale: number) {
-  const safeImageWidth = clamp(positiveFiniteOrFallback(imageWidth, 1), 1, MAX_RENDER_DIMENSION);
+export function computeRenderSize(imageWidth: number, aspectRatio: number, resolutionScale: number): RenderSize {
+  const safeImageWidth = positiveFiniteOrFallback(imageWidth, 1);
   const safeAspectRatio = clamp(positiveFiniteOrFallback(aspectRatio, 1), 1 / MAX_RENDER_DIMENSION, MAX_RENDER_DIMENSION);
   const safeResolutionScale = normalizeResolutionScale(resolutionScale);
   const width = clampDimension(Math.floor(safeImageWidth * safeResolutionScale));
@@ -28,11 +35,16 @@ export function createRenderSettings(
   overrides: Partial<Pick<RenderSettings, 'resolutionScale' | 'samplesPerPixel' | 'maxDepth' | 'paused'>> = {},
 ): RenderSettings {
   const resolutionScale = normalizeResolutionScale(overrides.resolutionScale);
-  const samplesPerPixel = Math.max(
-    1,
+  const samplesPerPixel = clampDimensionToRange(
     Math.floor(finiteOrFallback(overrides.samplesPerPixel, preset.samplesPerPixel)),
+    1,
+    MAX_SAMPLES_PER_PIXEL,
   );
-  const maxDepth = Math.max(1, Math.floor(finiteOrFallback(overrides.maxDepth, preset.maxDepth)));
+  const maxDepth = clampDimensionToRange(
+    Math.floor(finiteOrFallback(overrides.maxDepth, preset.maxDepth)),
+    1,
+    MAX_MAX_DEPTH,
+  );
 
   return {
     presetId: preset.id,
@@ -73,5 +85,9 @@ function normalizeResolutionScale(value: number | undefined): number {
 }
 
 function clampDimension(value: number): number {
-  return Math.floor(clamp(finiteOrFallback(value, 1), 1, MAX_RENDER_DIMENSION));
+  return clampDimensionToRange(value, 1, MAX_RENDER_DIMENSION);
+}
+
+function clampDimensionToRange(value: number, min: number, max: number): number {
+  return Math.floor(clamp(finiteOrFallback(value, min), min, max));
 }

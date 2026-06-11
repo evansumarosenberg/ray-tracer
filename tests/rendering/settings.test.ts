@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { BOOK_QUALITY_PRESET, DEVELOPMENT_PRESET } from '../../src/presets/renderPresets';
 import {
+  MAX_MAX_DEPTH,
   MAX_RESOLUTION_SCALE,
   MAX_RENDER_DIMENSION,
+  MAX_SAMPLES_PER_PIXEL,
   MIN_RESOLUTION_SCALE,
   computeRenderSize,
   createRenderSettings,
@@ -13,6 +15,7 @@ describe('render settings', () => {
   it('computes 16:9 render sizes from image width and scale', () => {
     expect(computeRenderSize(1200, 16 / 9, 1)).toEqual({ width: 1200, height: 675 });
     expect(computeRenderSize(1200, 16 / 9, 0.5)).toEqual({ width: 600, height: 337 });
+    expect(computeRenderSize(20_000, 16 / 9, 0.5)).toEqual({ width: 10_000, height: 5625 });
   });
 
   it('always computes finite positive render sizes from unsafe inputs', () => {
@@ -44,6 +47,9 @@ describe('render settings', () => {
   it('caps finite extreme render sizes', () => {
     const tinyAspectRatio = computeRenderSize(1200, Number.MIN_VALUE, 1);
     const hugeWidth = computeRenderSize(Number.MAX_VALUE, 0.1, 1);
+
+    expect(hugeWidth.width).toBe(MAX_RENDER_DIMENSION);
+    expect(hugeWidth.height).toBe(MAX_RENDER_DIMENSION);
 
     for (const size of [tinyAspectRatio, hugeWidth]) {
       expect(Number.isInteger(size.width)).toBe(true);
@@ -91,6 +97,13 @@ describe('render settings', () => {
     expect(createRenderSettings(DEVELOPMENT_PRESET, { resolutionScale: 2 }).resolutionScale).toBe(
       MAX_RESOLUTION_SCALE,
     );
+
+    const hugeQuality = createRenderSettings(DEVELOPMENT_PRESET, {
+      samplesPerPixel: Number.MAX_VALUE,
+      maxDepth: Number.MAX_VALUE,
+    });
+    expect(hugeQuality.samplesPerPixel).toBe(MAX_SAMPLES_PER_PIXEL);
+    expect(hugeQuality.maxDepth).toBe(MAX_MAX_DEPTH);
   });
 
   it('identifies render-affecting setting changes', () => {
