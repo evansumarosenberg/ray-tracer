@@ -2,6 +2,7 @@ import type { RenderPreset } from '../presets/renderPresets';
 
 export const MIN_RESOLUTION_SCALE = 0.1;
 export const MAX_RESOLUTION_SCALE = 1;
+export const MAX_RENDER_DIMENSION = 16_384;
 
 export interface RenderSettings {
   presetId: RenderPreset['id'];
@@ -14,11 +15,11 @@ export interface RenderSettings {
 }
 
 export function computeRenderSize(imageWidth: number, aspectRatio: number, resolutionScale: number) {
-  const safeImageWidth = positiveFiniteOrFallback(imageWidth, 1);
-  const safeAspectRatio = positiveFiniteOrFallback(aspectRatio, 1);
+  const safeImageWidth = clamp(positiveFiniteOrFallback(imageWidth, 1), 1, MAX_RENDER_DIMENSION);
+  const safeAspectRatio = clamp(positiveFiniteOrFallback(aspectRatio, 1), 1 / MAX_RENDER_DIMENSION, MAX_RENDER_DIMENSION);
   const safeResolutionScale = normalizeResolutionScale(resolutionScale);
-  const width = Math.max(1, Math.floor(safeImageWidth * safeResolutionScale));
-  const height = Math.max(1, Math.floor(width / safeAspectRatio));
+  const width = clampDimension(Math.floor(safeImageWidth * safeResolutionScale));
+  const height = clampDimension(Math.floor(width / safeAspectRatio));
   return { width, height };
 }
 
@@ -69,4 +70,8 @@ function positiveFiniteOrFallback(value: number, fallback: number): number {
 
 function normalizeResolutionScale(value: number | undefined): number {
   return clamp(finiteOrFallback(value, MAX_RESOLUTION_SCALE), MIN_RESOLUTION_SCALE, MAX_RESOLUTION_SCALE);
+}
+
+function clampDimension(value: number): number {
+  return Math.floor(clamp(finiteOrFallback(value, 1), 1, MAX_RENDER_DIMENSION));
 }

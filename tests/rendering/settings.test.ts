@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BOOK_QUALITY_PRESET, DEVELOPMENT_PRESET } from '../../src/presets/renderPresets';
 import {
   MAX_RESOLUTION_SCALE,
+  MAX_RENDER_DIMENSION,
   MIN_RESOLUTION_SCALE,
   computeRenderSize,
   createRenderSettings,
@@ -35,6 +36,22 @@ describe('render settings', () => {
       expect(Number.isInteger(size.height), `${label} height integer`).toBe(true);
       expect(size.width, `${label} width positive`).toBeGreaterThanOrEqual(1);
       expect(size.height, `${label} height positive`).toBeGreaterThanOrEqual(1);
+      expect(size.width, `${label} width capped`).toBeLessThanOrEqual(MAX_RENDER_DIMENSION);
+      expect(size.height, `${label} height capped`).toBeLessThanOrEqual(MAX_RENDER_DIMENSION);
+    }
+  });
+
+  it('caps finite extreme render sizes', () => {
+    const tinyAspectRatio = computeRenderSize(1200, Number.MIN_VALUE, 1);
+    const hugeWidth = computeRenderSize(Number.MAX_VALUE, 0.1, 1);
+
+    for (const size of [tinyAspectRatio, hugeWidth]) {
+      expect(Number.isInteger(size.width)).toBe(true);
+      expect(Number.isInteger(size.height)).toBe(true);
+      expect(size.width).toBeGreaterThanOrEqual(1);
+      expect(size.height).toBeGreaterThanOrEqual(1);
+      expect(size.width).toBeLessThanOrEqual(MAX_RENDER_DIMENSION);
+      expect(size.height).toBeLessThanOrEqual(MAX_RENDER_DIMENSION);
     }
   });
 
