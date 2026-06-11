@@ -21,13 +21,15 @@ export interface RenderPreset {
   readonly camera: CameraPreset;
 }
 
+const frozenVec3 = (x: number, y: number, z: number): Vec3 => Object.freeze([x, y, z] as const);
+
 const FINAL_CAMERA: CameraPreset = Object.freeze({
   aspectRatio: 16 / 9,
   imageWidth: 1200,
   vfov: 20,
-  lookFrom: [13, 2, 3] as const,
-  lookAt: [0, 0, 0] as const,
-  viewUp: [0, 1, 0] as const,
+  lookFrom: frozenVec3(13, 2, 3),
+  lookAt: frozenVec3(0, 0, 0),
+  viewUp: frozenVec3(0, 1, 0),
   defocusAngle: 0.6,
   focusDist: 10,
 });

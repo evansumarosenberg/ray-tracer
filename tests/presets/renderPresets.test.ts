@@ -25,6 +25,9 @@ describe('render presets', () => {
     expect(Object.isFrozen(DEVELOPMENT_PRESET)).toBe(true);
     expect(Object.isFrozen(BOOK_QUALITY_PRESET)).toBe(true);
     expect(Object.isFrozen(BOOK_QUALITY_PRESET.camera)).toBe(true);
+    expect(Object.isFrozen(BOOK_QUALITY_PRESET.camera.lookFrom)).toBe(true);
+    expect(Object.isFrozen(BOOK_QUALITY_PRESET.camera.lookAt)).toBe(true);
+    expect(Object.isFrozen(BOOK_QUALITY_PRESET.camera.viewUp)).toBe(true);
     expect(Object.isFrozen(RENDER_PRESETS)).toBe(true);
   });
 });
