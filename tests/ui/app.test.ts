@@ -80,6 +80,7 @@ describe('mountApp', () => {
   let timeoutCallbacks: Map<number, () => void>;
   let nextTimeoutId: number;
   let cancelAnimationFrameMock: ReturnType<typeof vi.fn>;
+  let setTimeoutMock: ReturnType<typeof vi.fn>;
   let clearTimeoutMock: ReturnType<typeof vi.fn>;
   let gl: WebGL2RenderingContext;
   let mountApp: typeof import('../../src/ui/app').mountApp;
@@ -116,12 +117,13 @@ describe('mountApp', () => {
       return id;
     }));
     vi.stubGlobal('cancelAnimationFrame', cancelAnimationFrameMock);
-    vi.stubGlobal('setTimeout', vi.fn((callback: () => void) => {
+    setTimeoutMock = vi.fn((callback: () => void) => {
       const id = nextTimeoutId;
       nextTimeoutId += 1;
       timeoutCallbacks.set(id, callback);
       return id;
-    }));
+    });
+    vi.stubGlobal('setTimeout', setTimeoutMock);
     vi.stubGlobal('clearTimeout', clearTimeoutMock);
 
     Object.defineProperty(dom.window.HTMLCanvasElement.prototype, 'getContext', {
@@ -137,6 +139,9 @@ describe('mountApp', () => {
     mocks.capabilityResult = { supported: false, reason: 'Floating-point framebuffer rendering is not supported.' };
 
     mountApp(root);
+    expect(statusText()).toBe('Initializing');
+
+    runStartup();
 
     expect(statusText()).toBe('Floating-point framebuffer rendering is not supported.');
     expect(disabledControlIds()).toEqual([
@@ -163,6 +168,7 @@ describe('mountApp', () => {
 
     expect(mocks.createFinalScene).not.toHaveBeenCalled();
     expect(mocks.rendererConstructorCalls).toHaveLength(0);
+    expect(setTimeoutMock).toHaveBeenCalledWith(expect.any(Function), 250);
 
     runNextTimeout();
 

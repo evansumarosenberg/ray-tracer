@@ -6,6 +6,8 @@ import { createFinalScene } from '../scene/finalScene';
 import { packSceneForGpu, type PackedScene } from '../scene/gpuPacking';
 import { downloadCanvasPng } from './exportPng';
 
+const STARTUP_RENDER_DELAY_MS = 250;
+
 interface AppState {
   preset: RenderPreset;
   resolutionScale: number;
@@ -60,6 +62,7 @@ export function mountApp(root: HTMLElement): () => void {
   };
   let renderer: ProgressiveRenderer | null = null;
   let packedScene: PackedScene | null = null;
+  let webGl: WebGL2RenderingContext | null = null;
   let animationFrameId = 0;
   let initializationTimeoutId = 0;
   let disposed = false;
@@ -75,29 +78,8 @@ export function mountApp(root: HTMLElement): () => void {
   resolutionInput.value = String(state.resolutionScale);
   maxDepthInput.value = String(state.preset.maxDepth);
 
-  const gl = canvas.getContext('webgl2', { preserveDrawingBuffer: true });
-  const capabilities = checkWebGlCapabilities(createWebGlCapabilityAdapter(gl));
-
-  if (!capabilities.supported) {
-    status.textContent = capabilities.reason;
-    disableControls(controls);
-    return () => {
-      disposed = true;
-    };
-  }
-
-  if (!gl) {
-    status.textContent = 'WebGL2 is required.';
-    disableControls(controls);
-    return () => {
-      disposed = true;
-    };
-  }
-
-  const webGl = gl;
-
   function recreateRenderer(): void {
-    if (!packedScene) {
+    if (!packedScene || !webGl) {
       return;
     }
 
@@ -158,6 +140,22 @@ export function mountApp(root: HTMLElement): () => void {
     }
 
     try {
+      const gl = canvas.getContext('webgl2', { preserveDrawingBuffer: true });
+      const capabilities = checkWebGlCapabilities(createWebGlCapabilityAdapter(gl));
+
+      if (!capabilities.supported) {
+        status.textContent = capabilities.reason;
+        disableControls(controls);
+        return;
+      }
+
+      if (!gl) {
+        status.textContent = 'WebGL2 is required.';
+        disableControls(controls);
+        return;
+      }
+
+      webGl = gl;
       packedScene = packSceneForGpu(createFinalScene());
       recreateRenderer();
     } catch (error) {
@@ -173,7 +171,8 @@ export function mountApp(root: HTMLElement): () => void {
       return;
     }
 
-    initializationTimeoutId = window.setTimeout(initializeRenderer, 0);
+    // First WebGL setup/draw can be expensive; keep startup observable before beginning it.
+    initializationTimeoutId = window.setTimeout(initializeRenderer, STARTUP_RENDER_DELAY_MS);
   }
 
   presetSelect.addEventListener('change', () => {
