@@ -288,6 +288,10 @@ function createDisplayUniforms(gl: WebGL2RenderingContext, program: WebGLProgram
 }
 
 function validateRendererOptions(options: RendererOptions): void {
+  if (options.packedScene.sphereCount < 1) {
+    throw new Error('ProgressiveRenderer requires at least one sphere.');
+  }
+
   if (options.packedScene.sphereCount > MAX_SHADER_SPHERES) {
     throw new Error(`ProgressiveRenderer supports at most ${MAX_SHADER_SPHERES} spheres.`);
   }

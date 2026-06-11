@@ -67,6 +67,17 @@ describe('ProgressiveRenderer', () => {
     expect(fake.deletedTextures).toHaveLength(0);
   });
 
+  it('rejects empty scenes before allocating resources', () => {
+    const fake = new FakeWebGl2();
+
+    expect(() => createRenderer(fake, { packedScene: createPackedScene(0) })).toThrow(
+      'ProgressiveRenderer requires at least one sphere.',
+    );
+
+    expect(fake.texImage2DCalls).toBe(0);
+    expect(fake.deletedTextures).toHaveLength(0);
+  });
+
   it('rejects maxDepth values larger than the shader ray loop cap', () => {
     const fake = new FakeWebGl2();
 
