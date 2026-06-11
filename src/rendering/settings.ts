@@ -1,5 +1,8 @@
 import type { RenderPreset } from '../presets/renderPresets';
 
+export const MIN_RESOLUTION_SCALE = 0.1;
+export const MAX_RESOLUTION_SCALE = 1;
+
 export interface RenderSettings {
   presetId: RenderPreset['id'];
   aspectRatio: number;
@@ -18,11 +21,18 @@ export function computeRenderSize(imageWidth: number, aspectRatio: number, resol
 
 export function createRenderSettings(
   preset: RenderPreset,
-  overrides: Partial<Pick<RenderSettings, 'resolutionScale' | 'samplesPerPixel' | 'maxDepth' | 'paused'>>,
+  overrides: Partial<Pick<RenderSettings, 'resolutionScale' | 'samplesPerPixel' | 'maxDepth' | 'paused'>> = {},
 ): RenderSettings {
-  const resolutionScale = clamp(overrides.resolutionScale ?? 1, 0.1, 1);
-  const samplesPerPixel = Math.max(1, Math.floor(overrides.samplesPerPixel ?? preset.samplesPerPixel));
-  const maxDepth = Math.max(1, Math.floor(overrides.maxDepth ?? preset.maxDepth));
+  const resolutionScale = clamp(
+    finiteOrFallback(overrides.resolutionScale, MAX_RESOLUTION_SCALE),
+    MIN_RESOLUTION_SCALE,
+    MAX_RESOLUTION_SCALE,
+  );
+  const samplesPerPixel = Math.max(
+    1,
+    Math.floor(finiteOrFallback(overrides.samplesPerPixel, preset.samplesPerPixel)),
+  );
+  const maxDepth = Math.max(1, Math.floor(finiteOrFallback(overrides.maxDepth, preset.maxDepth)));
 
   return {
     presetId: preset.id,
@@ -48,4 +58,8 @@ export function shouldResetAccumulation(previous: RenderSettings, next: RenderSe
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function finiteOrFallback(value: number | undefined, fallback: number): number {
+  return value === undefined || !Number.isFinite(value) ? fallback : value;
 }

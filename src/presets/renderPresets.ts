@@ -1,49 +1,51 @@
 import type { Vec3 } from '../math/vec3';
 
 export interface CameraPreset {
-  aspectRatio: number;
-  imageWidth: number;
-  vfov: number;
-  lookFrom: Vec3;
-  lookAt: Vec3;
-  viewUp: Vec3;
-  defocusAngle: number;
-  focusDist: number;
+  readonly aspectRatio: number;
+  readonly imageWidth: number;
+  readonly vfov: number;
+  readonly lookFrom: Vec3;
+  readonly lookAt: Vec3;
+  readonly viewUp: Vec3;
+  readonly defocusAngle: number;
+  readonly focusDist: number;
 }
+
+export type RenderPresetId = 'development' | 'book-quality';
 
 export interface RenderPreset {
-  id: 'development' | 'book-quality';
-  label: string;
-  samplesPerPixel: number;
-  maxDepth: number;
-  camera: CameraPreset;
+  readonly id: RenderPresetId;
+  readonly label: string;
+  readonly samplesPerPixel: number;
+  readonly maxDepth: number;
+  readonly camera: CameraPreset;
 }
 
-const FINAL_CAMERA: CameraPreset = {
+const FINAL_CAMERA: CameraPreset = Object.freeze({
   aspectRatio: 16 / 9,
   imageWidth: 1200,
   vfov: 20,
-  lookFrom: [13, 2, 3],
-  lookAt: [0, 0, 0],
-  viewUp: [0, 1, 0],
+  lookFrom: [13, 2, 3] as const,
+  lookAt: [0, 0, 0] as const,
+  viewUp: [0, 1, 0] as const,
   defocusAngle: 0.6,
   focusDist: 10,
-};
+});
 
-export const DEVELOPMENT_PRESET: RenderPreset = {
+export const DEVELOPMENT_PRESET: RenderPreset = Object.freeze({
   id: 'development',
   label: 'Development',
   samplesPerPixel: 10,
   maxDepth: 20,
   camera: FINAL_CAMERA,
-};
+});
 
-export const BOOK_QUALITY_PRESET: RenderPreset = {
+export const BOOK_QUALITY_PRESET: RenderPreset = Object.freeze({
   id: 'book-quality',
   label: 'Book Quality',
   samplesPerPixel: 500,
   maxDepth: 50,
   camera: FINAL_CAMERA,
-};
+});
 
-export const RENDER_PRESETS = [DEVELOPMENT_PRESET, BOOK_QUALITY_PRESET] as const;
+export const RENDER_PRESETS = Object.freeze([DEVELOPMENT_PRESET, BOOK_QUALITY_PRESET] as const);
