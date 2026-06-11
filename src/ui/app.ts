@@ -66,9 +66,11 @@ export function mountApp(root: HTMLElement): () => void {
   let renderer: ProgressiveRenderer | null = null;
   let packedScene: PackedScene | null = null;
   let webGl: WebGL2RenderingContext | null = null;
-  let animationFrameId = 0;
+  let initializationFrameId = 0;
+  let renderLoopFrameId = 0;
   let initializationTimeoutId = 0;
   let renderLoopTimeoutId = 0;
+  let renderLoopStarted = false;
   let disposed = false;
 
   for (const preset of RENDER_PRESETS) {
@@ -116,9 +118,13 @@ export function mountApp(root: HTMLElement): () => void {
       status.textContent = renderErrorMessage(error);
       renderer = null;
     }
+
+    interruptRenderLoopDelay();
   }
 
   function renderLoop(): void {
+    renderLoopFrameId = 0;
+
     if (disposed) {
       return;
     }
@@ -150,16 +156,33 @@ export function mountApp(root: HTMLElement): () => void {
       return;
     }
 
+    renderLoopStarted = true;
+
     if (delayMs > 0) {
       // Leave a small browser task gap between expensive progressive samples.
       renderLoopTimeoutId = window.setTimeout(() => {
         renderLoopTimeoutId = 0;
-        animationFrameId = requestAnimationFrame(renderLoop);
+        renderLoopFrameId = requestAnimationFrame(renderLoop);
       }, delayMs);
       return;
     }
 
-    animationFrameId = requestAnimationFrame(renderLoop);
+    if (renderLoopFrameId === 0) {
+      renderLoopFrameId = requestAnimationFrame(renderLoop);
+    }
+  }
+
+  function interruptRenderLoopDelay(): void {
+    if (!renderLoopStarted || disposed) {
+      return;
+    }
+
+    if (renderLoopTimeoutId !== 0) {
+      clearTimeout(renderLoopTimeoutId);
+      renderLoopTimeoutId = 0;
+    }
+
+    scheduleRenderLoop(0);
   }
 
   function initializeRenderer(): void {
@@ -239,11 +262,15 @@ export function mountApp(root: HTMLElement): () => void {
     downloadCanvasPng(canvas);
   });
 
-  animationFrameId = requestAnimationFrame(scheduleInitializationAfterPaint);
+  initializationFrameId = requestAnimationFrame(scheduleInitializationAfterPaint);
 
   return () => {
     disposed = true;
-    cancelAnimationFrame(animationFrameId);
+    cancelAnimationFrame(initializationFrameId);
+    if (renderLoopFrameId !== 0) {
+      cancelAnimationFrame(renderLoopFrameId);
+      renderLoopFrameId = 0;
+    }
     if (initializationTimeoutId !== 0) {
       clearTimeout(initializationTimeoutId);
       initializationTimeoutId = 0;

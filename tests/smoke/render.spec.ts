@@ -1,6 +1,10 @@
 import { expect, test } from '@playwright/test';
 
-const unsupportedPattern = /required|not supported/i;
+const unsupportedReasons: readonly string[] = [
+  'WebGL2 is required.',
+  'Floating-point color buffer support is required.',
+  'Floating-point framebuffer rendering is not supported.',
+];
 
 type SmokeResult =
   | { state: 'unsupported' }
@@ -19,17 +23,17 @@ test('renders a nonblank WebGL frame', async ({ page }) => {
   await expect(status).toBeVisible();
 
   const outcome = await page.waitForFunction(
-    (pattern) => {
+    (unsupportedMessages) => {
       const canvas = document.querySelector<HTMLCanvasElement>('#render-canvas');
       const status = document.querySelector<HTMLElement>('[data-testid="status"]');
       const statusText = status?.textContent ?? '';
 
-      if (new RegExp(pattern, 'i').test(statusText)) {
-        return { state: 'unsupported' };
-      }
-
       if (statusText.startsWith('Renderer error:')) {
         return { state: 'error', message: statusText };
+      }
+
+      if (unsupportedMessages.includes(statusText)) {
+        return { state: 'unsupported' };
       }
 
       if (canvas?.dataset.rendered !== 'true') {
@@ -58,7 +62,7 @@ test('renders a nonblank WebGL frame', async ({ page }) => {
 
       return { state: 'rendered', supported: true, nonblank: colorTotal > 0, maxChannel };
     },
-    unsupportedPattern.source,
+    unsupportedReasons,
     { timeout: 60_000 },
   );
   const renderState = (await outcome.jsonValue()) as SmokeResult;

@@ -282,6 +282,47 @@ describe('mountApp', () => {
     expect(setTimeoutMock).toHaveBeenLastCalledWith(expect.any(Function), 50);
   });
 
+  it('interrupts pending render pacing when reset recreates the renderer', () => {
+    mountApp(root);
+    runStartup();
+    runNextFrame();
+
+    expect(timeoutCallbacks.size).toBe(1);
+    expect(frameCallbacks.size).toBe(0);
+    expect(canvas().dataset.rendered).toBe('true');
+
+    click('#reset-render');
+
+    expect(clearTimeoutMock).toHaveBeenCalledWith(2);
+    expect(timeoutCallbacks.size).toBe(0);
+    expect(frameCallbacks.size).toBe(1);
+    expect(canvas().dataset.rendered).toBe('false');
+
+    runNextFrame();
+
+    expect(mocks.rendererInstances[mocks.rendererInstances.length - 1].renderFrame).toHaveBeenCalledOnce();
+  });
+
+  it('interrupts pending render pacing when settings recreate the renderer', () => {
+    mountApp(root);
+    runStartup();
+    runNextFrame();
+
+    expect(timeoutCallbacks.size).toBe(1);
+    expect(frameCallbacks.size).toBe(0);
+
+    setResolution('0.5');
+
+    expect(clearTimeoutMock).toHaveBeenCalledWith(2);
+    expect(timeoutCallbacks.size).toBe(0);
+    expect(frameCallbacks.size).toBe(1);
+    expect(lastRendererOptions().width).toBe(600);
+
+    runNextFrame();
+
+    expect(mocks.rendererInstances[mocks.rendererInstances.length - 1].renderFrame).toHaveBeenCalledOnce();
+  });
+
   function runStartup(): void {
     runNextFrame();
     runNextTimeout();
