@@ -14,6 +14,30 @@ describe('render settings', () => {
     expect(computeRenderSize(1200, 16 / 9, 0.5)).toEqual({ width: 600, height: 337 });
   });
 
+  it('always computes finite positive render sizes from unsafe inputs', () => {
+    const unsafeCases = [
+      { label: 'NaN width', args: [Number.NaN, 16 / 9, 1] },
+      { label: 'infinite width', args: [Number.POSITIVE_INFINITY, 16 / 9, 1] },
+      { label: 'negative infinite width', args: [Number.NEGATIVE_INFINITY, 16 / 9, 1] },
+      { label: 'zero aspect ratio', args: [1200, 0, 1] },
+      { label: 'NaN aspect ratio', args: [1200, Number.NaN, 1] },
+      { label: 'infinite aspect ratio', args: [1200, Number.POSITIVE_INFINITY, 1] },
+      { label: 'negative width and scale', args: [-1200, 16 / 9, -1] },
+      { label: 'negative aspect ratio', args: [1200, -16 / 9, 1] },
+      { label: 'infinite scale', args: [1200, 16 / 9, Number.POSITIVE_INFINITY] },
+      { label: 'negative infinite scale', args: [1200, 16 / 9, Number.NEGATIVE_INFINITY] },
+    ] satisfies Array<{ label: string; args: [number, number, number] }>;
+
+    for (const { label, args } of unsafeCases) {
+      const size = computeRenderSize(...args);
+
+      expect(Number.isInteger(size.width), `${label} width integer`).toBe(true);
+      expect(Number.isInteger(size.height), `${label} height integer`).toBe(true);
+      expect(size.width, `${label} width positive`).toBeGreaterThanOrEqual(1);
+      expect(size.height, `${label} height positive`).toBeGreaterThanOrEqual(1);
+    }
+  });
+
   it('validates user-adjustable values', () => {
     const settings = createRenderSettings(DEVELOPMENT_PRESET, {
       resolutionScale: 0.25,
@@ -28,11 +52,21 @@ describe('render settings', () => {
 
   it('normalizes unsafe numeric overrides', () => {
     expect(createRenderSettings(DEVELOPMENT_PRESET).resolutionScale).toBe(1);
-    expect(createRenderSettings(DEVELOPMENT_PRESET, { resolutionScale: Number.NaN }).resolutionScale).toBe(1);
 
-    const infiniteScale = createRenderSettings(DEVELOPMENT_PRESET, { resolutionScale: Number.POSITIVE_INFINITY });
-    expect(Number.isFinite(infiniteScale.resolutionScale)).toBe(true);
-    expect(infiniteScale.resolutionScale).toBe(1);
+    for (const unsafeValue of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      const settings = createRenderSettings(DEVELOPMENT_PRESET, {
+        resolutionScale: unsafeValue,
+        samplesPerPixel: unsafeValue,
+        maxDepth: unsafeValue,
+      });
+
+      expect(Number.isFinite(settings.resolutionScale)).toBe(true);
+      expect(settings.resolutionScale).toBe(1);
+      expect(Number.isFinite(settings.samplesPerPixel)).toBe(true);
+      expect(settings.samplesPerPixel).toBe(DEVELOPMENT_PRESET.samplesPerPixel);
+      expect(Number.isFinite(settings.maxDepth)).toBe(true);
+      expect(settings.maxDepth).toBe(DEVELOPMENT_PRESET.maxDepth);
+    }
 
     expect(createRenderSettings(DEVELOPMENT_PRESET, { resolutionScale: 0.01 }).resolutionScale).toBe(
       MIN_RESOLUTION_SCALE,
@@ -40,13 +74,6 @@ describe('render settings', () => {
     expect(createRenderSettings(DEVELOPMENT_PRESET, { resolutionScale: 2 }).resolutionScale).toBe(
       MAX_RESOLUTION_SCALE,
     );
-    expect(createRenderSettings(DEVELOPMENT_PRESET, { samplesPerPixel: Number.NaN }).samplesPerPixel).toBe(
-      DEVELOPMENT_PRESET.samplesPerPixel,
-    );
-
-    const infiniteDepth = createRenderSettings(DEVELOPMENT_PRESET, { maxDepth: Number.POSITIVE_INFINITY });
-    expect(Number.isFinite(infiniteDepth.maxDepth)).toBe(true);
-    expect(infiniteDepth.maxDepth).toBe(DEVELOPMENT_PRESET.maxDepth);
   });
 
   it('identifies render-affecting setting changes', () => {

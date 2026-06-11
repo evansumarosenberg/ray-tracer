@@ -14,8 +14,11 @@ export interface RenderSettings {
 }
 
 export function computeRenderSize(imageWidth: number, aspectRatio: number, resolutionScale: number) {
-  const width = Math.max(1, Math.floor(imageWidth * resolutionScale));
-  const height = Math.max(1, Math.floor(width / aspectRatio));
+  const safeImageWidth = positiveFiniteOrFallback(imageWidth, 1);
+  const safeAspectRatio = positiveFiniteOrFallback(aspectRatio, 1);
+  const safeResolutionScale = normalizeResolutionScale(resolutionScale);
+  const width = Math.max(1, Math.floor(safeImageWidth * safeResolutionScale));
+  const height = Math.max(1, Math.floor(width / safeAspectRatio));
   return { width, height };
 }
 
@@ -23,11 +26,7 @@ export function createRenderSettings(
   preset: RenderPreset,
   overrides: Partial<Pick<RenderSettings, 'resolutionScale' | 'samplesPerPixel' | 'maxDepth' | 'paused'>> = {},
 ): RenderSettings {
-  const resolutionScale = clamp(
-    finiteOrFallback(overrides.resolutionScale, MAX_RESOLUTION_SCALE),
-    MIN_RESOLUTION_SCALE,
-    MAX_RESOLUTION_SCALE,
-  );
+  const resolutionScale = normalizeResolutionScale(overrides.resolutionScale);
   const samplesPerPixel = Math.max(
     1,
     Math.floor(finiteOrFallback(overrides.samplesPerPixel, preset.samplesPerPixel)),
@@ -62,4 +61,12 @@ function clamp(value: number, min: number, max: number): number {
 
 function finiteOrFallback(value: number | undefined, fallback: number): number {
   return value === undefined || !Number.isFinite(value) ? fallback : value;
+}
+
+function positiveFiniteOrFallback(value: number, fallback: number): number {
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function normalizeResolutionScale(value: number | undefined): number {
+  return clamp(finiteOrFallback(value, MAX_RESOLUTION_SCALE), MIN_RESOLUTION_SCALE, MAX_RESOLUTION_SCALE);
 }

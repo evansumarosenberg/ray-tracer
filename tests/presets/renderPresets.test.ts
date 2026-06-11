@@ -22,12 +22,14 @@ describe('render presets', () => {
   });
 
   it('freezes exported preset objects', () => {
-    expect(Object.isFrozen(DEVELOPMENT_PRESET)).toBe(true);
-    expect(Object.isFrozen(BOOK_QUALITY_PRESET)).toBe(true);
-    expect(Object.isFrozen(BOOK_QUALITY_PRESET.camera)).toBe(true);
-    expect(Object.isFrozen(BOOK_QUALITY_PRESET.camera.lookFrom)).toBe(true);
-    expect(Object.isFrozen(BOOK_QUALITY_PRESET.camera.lookAt)).toBe(true);
-    expect(Object.isFrozen(BOOK_QUALITY_PRESET.camera.viewUp)).toBe(true);
     expect(Object.isFrozen(RENDER_PRESETS)).toBe(true);
+
+    for (const preset of RENDER_PRESETS) {
+      expect(Object.isFrozen(preset), preset.id).toBe(true);
+      expect(Object.isFrozen(preset.camera), preset.id).toBe(true);
+      expect(Object.isFrozen(preset.camera.lookFrom), preset.id).toBe(true);
+      expect(Object.isFrozen(preset.camera.lookAt), preset.id).toBe(true);
+      expect(Object.isFrozen(preset.camera.viewUp), preset.id).toBe(true);
+    }
   });
 });
