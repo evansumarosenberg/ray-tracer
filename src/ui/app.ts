@@ -61,6 +61,7 @@ export function mountApp(root: HTMLElement): () => void {
   let renderer: ProgressiveRenderer | null = null;
   let packedScene: PackedScene | null = null;
   let animationFrameId = 0;
+  let initializationTimeoutId = 0;
   let disposed = false;
 
   for (const preset of RENDER_PRESETS) {
@@ -150,6 +151,8 @@ export function mountApp(root: HTMLElement): () => void {
   }
 
   function initializeRenderer(): void {
+    initializationTimeoutId = 0;
+
     if (disposed) {
       return;
     }
@@ -163,6 +166,14 @@ export function mountApp(root: HTMLElement): () => void {
     }
 
     animationFrameId = requestAnimationFrame(renderLoop);
+  }
+
+  function scheduleInitializationAfterPaint(): void {
+    if (disposed) {
+      return;
+    }
+
+    initializationTimeoutId = window.setTimeout(initializeRenderer, 0);
   }
 
   presetSelect.addEventListener('change', () => {
@@ -199,11 +210,15 @@ export function mountApp(root: HTMLElement): () => void {
     downloadCanvasPng(canvas);
   });
 
-  animationFrameId = requestAnimationFrame(initializeRenderer);
+  animationFrameId = requestAnimationFrame(scheduleInitializationAfterPaint);
 
   return () => {
     disposed = true;
     cancelAnimationFrame(animationFrameId);
+    if (initializationTimeoutId !== 0) {
+      clearTimeout(initializationTimeoutId);
+      initializationTimeoutId = 0;
+    }
     renderer?.dispose();
     renderer = null;
   };

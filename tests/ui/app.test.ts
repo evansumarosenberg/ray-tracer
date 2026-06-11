@@ -77,7 +77,10 @@ describe('mountApp', () => {
   let root: HTMLElement;
   let frameCallbacks: Map<number, FrameRequestCallback>;
   let nextFrameId: number;
+  let timeoutCallbacks: Map<number, () => void>;
+  let nextTimeoutId: number;
   let cancelAnimationFrameMock: ReturnType<typeof vi.fn>;
+  let clearTimeoutMock: ReturnType<typeof vi.fn>;
   let gl: WebGL2RenderingContext;
   let mountApp: typeof import('../../src/ui/app').mountApp;
 
@@ -85,8 +88,13 @@ describe('mountApp', () => {
     const dom = new JSDOM('<main id="app"></main>');
     frameCallbacks = new Map();
     nextFrameId = 1;
+    timeoutCallbacks = new Map();
+    nextTimeoutId = 1;
     cancelAnimationFrameMock = vi.fn((id: number) => {
       frameCallbacks.delete(id);
+    });
+    clearTimeoutMock = vi.fn((id: number) => {
+      timeoutCallbacks.delete(id);
     });
     gl = { kind: 'webgl2' } as unknown as WebGL2RenderingContext;
     mocks.capabilityResult = { supported: true };
@@ -108,6 +116,13 @@ describe('mountApp', () => {
       return id;
     }));
     vi.stubGlobal('cancelAnimationFrame', cancelAnimationFrameMock);
+    vi.stubGlobal('setTimeout', vi.fn((callback: () => void) => {
+      const id = nextTimeoutId;
+      nextTimeoutId += 1;
+      timeoutCallbacks.set(id, callback);
+      return id;
+    }));
+    vi.stubGlobal('clearTimeout', clearTimeoutMock);
 
     Object.defineProperty(dom.window.HTMLCanvasElement.prototype, 'getContext', {
       configurable: true,
@@ -136,7 +151,7 @@ describe('mountApp', () => {
     expect(mocks.rendererConstructorCalls).toHaveLength(0);
   });
 
-  it('mounts the shell before deferred scene packing and renderer construction', () => {
+  it('mounts the shell through a paint boundary before scene packing and renderer construction', () => {
     mountApp(root);
 
     expect(root.querySelector('#render-canvas')).toBeInstanceOf(HTMLCanvasElement);
@@ -146,13 +161,18 @@ describe('mountApp', () => {
 
     runNextFrame();
 
+    expect(mocks.createFinalScene).not.toHaveBeenCalled();
+    expect(mocks.rendererConstructorCalls).toHaveLength(0);
+
+    runNextTimeout();
+
     expect(mocks.createFinalScene).toHaveBeenCalledOnce();
     expect(mocks.rendererConstructorCalls).toHaveLength(1);
   });
 
   it('creates Book Quality renderer settings from the preset control', () => {
     mountApp(root);
-    runNextFrame();
+    runStartup();
 
     selectPreset('book-quality');
 
@@ -162,7 +182,7 @@ describe('mountApp', () => {
 
   it('disposes and recreates the renderer on resolution and preset changes', () => {
     mountApp(root);
-    runNextFrame();
+    runStartup();
     const firstRenderer = mocks.rendererInstances[0];
 
     setResolution('0.5');
@@ -179,7 +199,7 @@ describe('mountApp', () => {
 
   it('cleanup cancels RAF and disposes the active renderer', () => {
     const cleanup = mountApp(root);
-    runNextFrame();
+    runStartup();
     const renderer = mocks.rendererInstances[0];
 
     cleanup();
@@ -188,10 +208,22 @@ describe('mountApp', () => {
     expect(renderer.dispose).toHaveBeenCalledOnce();
   });
 
+  it('cleanup before startup cancels pending initialization work', () => {
+    const cleanup = mountApp(root);
+    runNextFrame();
+
+    cleanup();
+    runAllTimeouts();
+
+    expect(clearTimeoutMock).toHaveBeenCalled();
+    expect(mocks.createFinalScene).not.toHaveBeenCalled();
+    expect(mocks.rendererConstructorCalls).toHaveLength(0);
+  });
+
   it('shows renderer creation failures and recovers on reset', () => {
     mocks.constructorError = new Error('compile failed');
     mountApp(root);
-    runNextFrame();
+    runStartup();
 
     expect(statusText()).toBe('Renderer error: compile failed');
     expect(mocks.rendererInstances).toHaveLength(0);
@@ -205,7 +237,7 @@ describe('mountApp', () => {
 
   it('handles renderFrame failures and allows reset recovery', () => {
     mountApp(root);
-    runNextFrame();
+    runStartup();
     const renderer = mocks.rendererInstances[0];
     mocks.renderFrameError = new Error('draw failed');
 
@@ -221,6 +253,11 @@ describe('mountApp', () => {
     expect(statusText()).toBe('0 / 10 samples');
   });
 
+  function runStartup(): void {
+    runNextFrame();
+    runNextTimeout();
+  }
+
   function runNextFrame(): void {
     const next = frameCallbacks.entries().next();
 
@@ -231,6 +268,24 @@ describe('mountApp', () => {
     const [id, callback] = next.value;
     frameCallbacks.delete(id);
     callback(16);
+  }
+
+  function runNextTimeout(): void {
+    const next = timeoutCallbacks.entries().next();
+
+    if (next.done) {
+      throw new Error('No queued timeout');
+    }
+
+    const [id, callback] = next.value;
+    timeoutCallbacks.delete(id);
+    callback();
+  }
+
+  function runAllTimeouts(): void {
+    while (timeoutCallbacks.size > 0) {
+      runNextTimeout();
+    }
   }
 
   function statusText(): string {
