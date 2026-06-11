@@ -14,6 +14,10 @@ export interface BuiltCamera {
 }
 
 export function buildCamera(preset: CameraPreset, imageWidth: number, imageHeight: number): BuiltCamera {
+  if (!isPositiveFinite(imageWidth) || !isPositiveFinite(imageHeight)) {
+    throw new Error('Camera image dimensions must be finite positive numbers');
+  }
+
   const center = preset.lookFrom;
   const theta = degreesToRadians(preset.vfov);
   const h = Math.tan(theta / 2);
@@ -44,4 +48,8 @@ export function buildCamera(preset: CameraPreset, imageWidth: number, imageHeigh
 
 export function degreesToRadians(degrees: number): number {
   return (degrees * Math.PI) / 180;
+}
+
+function isPositiveFinite(value: number): boolean {
+  return Number.isFinite(value) && value > 0;
 }
