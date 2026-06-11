@@ -67,6 +67,16 @@ export function createProgram(
 }
 
 export function createFloatTexture(gl: WebGL2RenderingContext, width: number, height: number): WebGLTexture {
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) {
+    throw new Error('Float texture dimensions must be finite positive integers.');
+  }
+
+  const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
+
+  if (width > maxTextureSize || height > maxTextureSize) {
+    throw new Error(`Float texture dimensions exceed MAX_TEXTURE_SIZE ${maxTextureSize}.`);
+  }
+
   const texture = gl.createTexture();
 
   if (!texture) {
@@ -82,6 +92,11 @@ export function createFloatTexture(gl: WebGL2RenderingContext, width: number, he
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, width, height, 0, gl.RGBA, gl.FLOAT, null);
+    const error = gl.getError();
+
+    if (error !== gl.NO_ERROR) {
+      throw new Error(`Failed to allocate float texture; WebGL error ${formatGlEnum(error)}.`);
+    }
   } catch (error) {
     gl.deleteTexture(texture);
     throw error;
@@ -102,21 +117,26 @@ export function createFramebufferForTexture(
     throw new Error('Failed to create WebGL framebuffer.');
   }
 
-  const previousFramebuffer = gl.getParameter(gl.FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
+  const previousDrawFramebuffer = gl.getParameter(gl.DRAW_FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
 
   try {
-    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, framebuffer);
+    gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+    const status = gl.checkFramebufferStatus(gl.DRAW_FRAMEBUFFER);
 
-    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
-      throw new Error('WebGL framebuffer is incomplete.');
+    if (status !== gl.FRAMEBUFFER_COMPLETE) {
+      throw new Error(`WebGL framebuffer is incomplete: ${formatGlEnum(status)}.`);
     }
   } catch (error) {
     gl.deleteFramebuffer(framebuffer);
     throw error;
   } finally {
-    gl.bindFramebuffer(gl.FRAMEBUFFER, previousFramebuffer);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, previousDrawFramebuffer);
   }
 
   return framebuffer;
+}
+
+function formatGlEnum(value: GLenum): string {
+  return `0x${value.toString(16).padStart(4, '0')}`;
 }

@@ -36,7 +36,7 @@ export function createWebGlCapabilityAdapter(gl: WebGL2RenderingContext | null):
       let texture: WebGLTexture | null = null;
       let framebuffer: WebGLFramebuffer | null = null;
       const previousTexture = gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture | null;
-      const previousFramebuffer = gl.getParameter(gl.FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
+      const previousDrawFramebuffer = gl.getParameter(gl.DRAW_FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
 
       try {
         texture = gl.createTexture();
@@ -58,14 +58,14 @@ export function createWebGlCapabilityAdapter(gl: WebGL2RenderingContext | null):
           return false;
         }
 
-        gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+        gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, framebuffer);
+        gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
 
-        return gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+        return gl.checkFramebufferStatus(gl.DRAW_FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
       } catch {
         return false;
       } finally {
-        gl.bindFramebuffer(gl.FRAMEBUFFER, previousFramebuffer);
+        gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, previousDrawFramebuffer);
         gl.bindTexture(gl.TEXTURE_2D, previousTexture);
 
         if (framebuffer) {
