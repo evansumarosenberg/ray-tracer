@@ -28,12 +28,81 @@ body {
   border-left: 1px solid #303832;
   padding: 16px;
   background: #1c221f;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .controls h1 {
-  margin: 0 0 12px;
+  margin: 0;
   font-size: 20px;
   font-weight: 650;
+}
+
+.controls p {
+  margin: 0;
+  color: #c8d0c9;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.control-field {
+  display: grid;
+  gap: 6px;
+  color: #dce5de;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.control-field select,
+.control-field input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #3b4740;
+  border-radius: 6px;
+  background: #101411;
+  color: #f5f7fa;
+  font: inherit;
+  font-weight: 500;
+  min-height: 36px;
+  padding: 7px 9px;
+}
+
+.control-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.control-actions button {
+  border: 1px solid #46534b;
+  border-radius: 6px;
+  background: #27312b;
+  color: #f5f7fa;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  min-height: 36px;
+  padding: 8px 10px;
+}
+
+.control-actions button:hover:not(:disabled),
+.control-field select:hover:not(:disabled),
+.control-field input:hover:not(:disabled) {
+  border-color: #637268;
+}
+
+.control-actions button:disabled,
+.control-field select:disabled,
+.control-field input:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+#export-png {
+  grid-column: 1 / -1;
 }
 
 @media (max-width: 760px) {
