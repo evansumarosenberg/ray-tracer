@@ -11,6 +11,9 @@ const SPHERE_DATA_TEXTURE_UNIT = 1;
 const MATERIAL_DATA_TEXTURE_UNIT = 2;
 const DISPLAY_ACCUMULATION_TEXTURE_UNIT = 0;
 
+export const MAX_SHADER_SPHERES = 1024;
+export const MAX_SHADER_DEPTH = 64;
+
 export interface RendererOptions {
   canvas: HTMLCanvasElement;
   gl: WebGL2RenderingContext;
@@ -53,16 +56,16 @@ interface DisplayUniforms {
 export class ProgressiveRenderer {
   private readonly gl: WebGL2RenderingContext;
   private readonly canvas: HTMLCanvasElement;
-  private readonly camera: BuiltCamera;
-  private readonly pathProgram: WebGLProgram;
-  private readonly displayProgram: WebGLProgram;
-  private readonly vertexArray: WebGLVertexArrayObject;
-  private readonly pathUniforms: PathTraceUniforms;
-  private readonly displayUniforms: DisplayUniforms;
-  private readonly accumulationTextures: readonly [WebGLTexture, WebGLTexture];
-  private readonly accumulationFramebuffers: readonly [WebGLFramebuffer, WebGLFramebuffer];
-  private readonly sphereTexture: WebGLTexture;
-  private readonly materialTexture: WebGLTexture;
+  private readonly camera!: BuiltCamera;
+  private readonly pathProgram!: WebGLProgram;
+  private readonly displayProgram!: WebGLProgram;
+  private readonly vertexArray!: WebGLVertexArrayObject;
+  private readonly pathUniforms!: PathTraceUniforms;
+  private readonly displayUniforms!: DisplayUniforms;
+  private readonly accumulationTextures!: readonly [WebGLTexture, WebGLTexture];
+  private readonly accumulationFramebuffers!: readonly [WebGLFramebuffer, WebGLFramebuffer];
+  private readonly sphereTexture!: WebGLTexture;
+  private readonly materialTexture!: WebGLTexture;
 
   private sampleCount = 0;
   private currentAccumulationIndex = 0;
@@ -71,46 +74,75 @@ export class ProgressiveRenderer {
   constructor(private readonly options: RendererOptions) {
     this.gl = options.gl;
     this.canvas = options.canvas;
-    this.canvas.width = options.width;
-    this.canvas.height = options.height;
-    this.camera = buildCamera(options.preset.camera, options.width, options.height);
+    validateRendererOptions(options);
 
-    const vertexArray = this.gl.createVertexArray();
+    const createdPrograms: WebGLProgram[] = [];
+    const createdTextures: WebGLTexture[] = [];
+    const createdFramebuffers: WebGLFramebuffer[] = [];
+    const createdVertexArrays: WebGLVertexArrayObject[] = [];
 
-    if (!vertexArray) {
-      throw new Error('Failed to create WebGL vertex array.');
+    try {
+      this.canvas.width = options.width;
+      this.canvas.height = options.height;
+      this.camera = buildCamera(options.preset.camera, options.width, options.height);
+
+      const vertexArray = this.gl.createVertexArray();
+
+      if (!vertexArray) {
+        throw new Error('Failed to create WebGL vertex array.');
+      }
+
+      createdVertexArrays.push(vertexArray);
+      this.vertexArray = vertexArray;
+
+      this.pathProgram = createProgram(this.gl, fullscreenVertexShader, pathTraceFragmentShader);
+      createdPrograms.push(this.pathProgram);
+      this.displayProgram = createProgram(this.gl, fullscreenVertexShader, displayFragmentShader);
+      createdPrograms.push(this.displayProgram);
+      this.pathUniforms = createPathTraceUniforms(this.gl, this.pathProgram);
+      this.displayUniforms = createDisplayUniforms(this.gl, this.displayProgram);
+
+      const accumulationTextureA = createFloatTexture(this.gl, options.width, options.height);
+      createdTextures.push(accumulationTextureA);
+      const accumulationTextureB = createFloatTexture(this.gl, options.width, options.height);
+      createdTextures.push(accumulationTextureB);
+      this.accumulationTextures = [accumulationTextureA, accumulationTextureB];
+
+      const accumulationFramebufferA = createFramebufferForTexture(this.gl, accumulationTextureA);
+      createdFramebuffers.push(accumulationFramebufferA);
+      const accumulationFramebufferB = createFramebufferForTexture(this.gl, accumulationTextureB);
+      createdFramebuffers.push(accumulationFramebufferB);
+      this.accumulationFramebuffers = [accumulationFramebufferA, accumulationFramebufferB];
+
+      this.sphereTexture = createFloatDataTexture(
+        this.gl,
+        options.packedScene.sphereCount,
+        1,
+        options.packedScene.spheres,
+        'sphere data',
+      );
+      createdTextures.push(this.sphereTexture);
+      this.materialTexture = createFloatDataTexture(
+        this.gl,
+        options.packedScene.sphereCount * 2,
+        1,
+        options.packedScene.materials,
+        'material data',
+      );
+      createdTextures.push(this.materialTexture);
+
+      this.configureStaticUniforms();
+      this.reset();
+    } catch (error) {
+      deleteCreatedResources(this.gl, {
+        programs: createdPrograms,
+        textures: createdTextures,
+        framebuffers: createdFramebuffers,
+        vertexArrays: createdVertexArrays,
+      });
+      this.disposed = true;
+      throw error;
     }
-
-    this.vertexArray = vertexArray;
-    this.pathProgram = createProgram(this.gl, fullscreenVertexShader, pathTraceFragmentShader);
-    this.displayProgram = createProgram(this.gl, fullscreenVertexShader, displayFragmentShader);
-    this.pathUniforms = createPathTraceUniforms(this.gl, this.pathProgram);
-    this.displayUniforms = createDisplayUniforms(this.gl, this.displayProgram);
-    this.accumulationTextures = [
-      createFloatTexture(this.gl, options.width, options.height),
-      createFloatTexture(this.gl, options.width, options.height),
-    ];
-    this.accumulationFramebuffers = [
-      createFramebufferForTexture(this.gl, this.accumulationTextures[0]),
-      createFramebufferForTexture(this.gl, this.accumulationTextures[1]),
-    ];
-    this.sphereTexture = createFloatDataTexture(
-      this.gl,
-      options.packedScene.sphereCount,
-      1,
-      options.packedScene.spheres,
-      'sphere data',
-    );
-    this.materialTexture = createFloatDataTexture(
-      this.gl,
-      options.packedScene.sphereCount * 2,
-      1,
-      options.packedScene.materials,
-      'material data',
-    );
-
-    this.configureStaticUniforms();
-    this.reset();
   }
 
   renderFrame(): RenderStats {
@@ -255,6 +287,20 @@ function createDisplayUniforms(gl: WebGL2RenderingContext, program: WebGLProgram
   };
 }
 
+function validateRendererOptions(options: RendererOptions): void {
+  if (options.packedScene.sphereCount > MAX_SHADER_SPHERES) {
+    throw new Error(`ProgressiveRenderer supports at most ${MAX_SHADER_SPHERES} spheres.`);
+  }
+
+  if (!Number.isInteger(options.maxDepth) || options.maxDepth <= 0) {
+    throw new Error('ProgressiveRenderer maxDepth must be a positive integer.');
+  }
+
+  if (options.maxDepth > MAX_SHADER_DEPTH) {
+    throw new Error(`ProgressiveRenderer maxDepth must be <= ${MAX_SHADER_DEPTH}.`);
+  }
+}
+
 function requiredUniform(
   gl: WebGL2RenderingContext,
   program: WebGLProgram,
@@ -318,6 +364,7 @@ function clearFramebuffers(
 ): void {
   const previousDrawFramebuffer = gl.getParameter(gl.DRAW_FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
   const previousClearColor = gl.getParameter(gl.COLOR_CLEAR_VALUE) as Float32Array;
+  const previousViewport = gl.getParameter(gl.VIEWPORT) as Int32Array;
 
   gl.viewport(0, 0, width, height);
   gl.clearColor(0, 0, 0, 0);
@@ -329,8 +376,34 @@ function clearFramebuffers(
 
   gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, previousDrawFramebuffer);
   gl.clearColor(previousClearColor[0], previousClearColor[1], previousClearColor[2], previousClearColor[3]);
+  gl.viewport(previousViewport[0], previousViewport[1], previousViewport[2], previousViewport[3]);
 }
 
 function formatGlEnum(value: GLenum): string {
   return `0x${value.toString(16).padStart(4, '0')}`;
+}
+
+interface CreatedResources {
+  readonly programs: readonly WebGLProgram[];
+  readonly textures: readonly WebGLTexture[];
+  readonly framebuffers: readonly WebGLFramebuffer[];
+  readonly vertexArrays: readonly WebGLVertexArrayObject[];
+}
+
+function deleteCreatedResources(gl: WebGL2RenderingContext, resources: CreatedResources): void {
+  for (const program of resources.programs) {
+    gl.deleteProgram(program);
+  }
+
+  for (const framebuffer of resources.framebuffers) {
+    gl.deleteFramebuffer(framebuffer);
+  }
+
+  for (const texture of resources.textures) {
+    gl.deleteTexture(texture);
+  }
+
+  for (const vertexArray of resources.vertexArrays) {
+    gl.deleteVertexArray(vertexArray);
+  }
 }

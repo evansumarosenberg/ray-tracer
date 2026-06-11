@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MAX_SHADER_SPHERES } from '../../src/rendering/renderer';
 import { displayFragmentShader } from '../../src/shaders/display.frag';
 import { fullscreenVertexShader } from '../../src/shaders/fullscreen.vert';
 import { pathTraceFragmentShader } from '../../src/shaders/pathTrace.frag';
@@ -36,6 +37,7 @@ describe('shader sources', () => {
     expect(pathTraceFragmentShader).toContain('materialA');
     expect(pathTraceFragmentShader).toContain('materialB');
     expect(pathTraceFragmentShader).toContain('texelFetch(uMaterialData, ivec2(index * 2');
+    expect(pathTraceFragmentShader).toContain(`i < ${MAX_SHADER_SPHERES}`);
   });
 
   it('exports a display shader that averages and gamma corrects accumulation', () => {
