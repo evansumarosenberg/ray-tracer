@@ -63,12 +63,15 @@ Key source references:
 
 - [ ] **Step 1: Create package metadata and install tooling**
 
+Install the newest release versions available from npm at execution time. Use npm's `latest`
+dist-tag explicitly rather than pinning older versions.
+
 Run:
 
 ```bash
 npm init -y
 npm install
-npm install -D typescript vite vitest jsdom @playwright/test
+npm install -D typescript@latest vite@latest vitest@latest jsdom@latest @playwright/test@latest
 ```
 
 Then set scripts in `package.json` to:
