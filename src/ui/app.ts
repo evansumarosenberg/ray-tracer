@@ -26,14 +26,9 @@ export function mountApp(root: HTMLElement): () => void {
           <select id="preset-select"></select>
         </label>
 
-        <label class="control-field" for="resolution-scale">
+        <label class="control-field" for="resolution">
           <span>Resolution</span>
-          <select id="resolution-scale">
-            <option value="1">100%</option>
-            <option value="0.75">75%</option>
-            <option value="0.5">50%</option>
-            <option value="0.25">25%</option>
-          </select>
+          <input id="resolution" type="range" min="0.1" max="1" step="0.05" value="1" />
         </label>
 
         <label class="control-field" for="max-depth">
@@ -53,12 +48,12 @@ export function mountApp(root: HTMLElement): () => void {
   const canvas = requireElement<HTMLCanvasElement>(root, '#render-canvas');
   const status = requireElement<HTMLParagraphElement>(root, '#status');
   const presetSelect = requireElement<HTMLSelectElement>(root, '#preset-select');
-  const resolutionScaleSelect = requireElement<HTMLSelectElement>(root, '#resolution-scale');
+  const resolutionInput = requireElement<HTMLInputElement>(root, '#resolution');
   const maxDepthInput = requireElement<HTMLInputElement>(root, '#max-depth');
   const pauseToggle = requireElement<HTMLButtonElement>(root, '#pause-toggle');
   const resetButton = requireElement<HTMLButtonElement>(root, '#reset-render');
   const exportButton = requireElement<HTMLButtonElement>(root, '#export-png');
-  const controls = [presetSelect, resolutionScaleSelect, maxDepthInput, pauseToggle, resetButton, exportButton];
+  const controls = [presetSelect, resolutionInput, maxDepthInput, pauseToggle, resetButton, exportButton];
   const state: AppState = {
     preset: RENDER_PRESETS[0],
     resolutionScale: 1,
@@ -78,7 +73,7 @@ export function mountApp(root: HTMLElement): () => void {
   }
 
   presetSelect.value = state.preset.id;
-  resolutionScaleSelect.value = String(state.resolutionScale);
+  resolutionInput.value = String(state.resolutionScale);
   maxDepthInput.value = String(state.maxDepth);
 
   const gl = canvas.getContext('webgl2', { preserveDrawingBuffer: true });
@@ -161,8 +156,8 @@ export function mountApp(root: HTMLElement): () => void {
     recreateRenderer();
   });
 
-  resolutionScaleSelect.addEventListener('change', () => {
-    state.resolutionScale = Number(resolutionScaleSelect.value);
+  resolutionInput.addEventListener('input', () => {
+    state.resolutionScale = Number(resolutionInput.value);
     recreateRenderer();
   });
 
