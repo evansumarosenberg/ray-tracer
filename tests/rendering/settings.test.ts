@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { BOOK_QUALITY_PRESET, DEVELOPMENT_PRESET } from '../../src/presets/renderPresets';
 import {
-  MAX_MAX_DEPTH,
   MAX_RESOLUTION_SCALE,
   MAX_RENDER_DIMENSION,
+  MAX_RENDER_DEPTH,
   MAX_SAMPLES_PER_PIXEL,
   MIN_RESOLUTION_SCALE,
   computeRenderSize,
   createRenderSettings,
   shouldResetAccumulation,
+  type RenderSettings,
 } from '../../src/rendering/settings';
 
 describe('render settings', () => {
@@ -103,21 +104,29 @@ describe('render settings', () => {
       maxDepth: Number.MAX_VALUE,
     });
     expect(hugeQuality.samplesPerPixel).toBe(MAX_SAMPLES_PER_PIXEL);
-    expect(hugeQuality.maxDepth).toBe(MAX_MAX_DEPTH);
+    expect(hugeQuality.maxDepth).toBe(MAX_RENDER_DEPTH);
+
+    for (const lowValue of [0, -1, 0.9]) {
+      const lowQuality = createRenderSettings(DEVELOPMENT_PRESET, {
+        samplesPerPixel: lowValue,
+        maxDepth: lowValue,
+      });
+
+      expect(lowQuality.samplesPerPixel).toBe(1);
+      expect(lowQuality.maxDepth).toBe(1);
+    }
   });
 
   it('identifies render-affecting setting changes', () => {
     const base = createRenderSettings(DEVELOPMENT_PRESET);
-    const renderAffectingChanges = [
-      { field: 'presetId', next: { ...base, presetId: BOOK_QUALITY_PRESET.id } },
-      { field: 'aspectRatio', next: { ...base, aspectRatio: 1 } },
-      { field: 'imageWidth', next: { ...base, imageWidth: base.imageWidth - 1 } },
-      { field: 'resolutionScale', next: { ...base, resolutionScale: base.resolutionScale / 2 } },
-      { field: 'samplesPerPixel', next: { ...base, samplesPerPixel: base.samplesPerPixel + 1 } },
-      { field: 'maxDepth', next: { ...base, maxDepth: base.maxDepth - 1 } },
-    ];
+    const renderAffectingEntries = Object.entries(base).filter(([field]) => field !== 'paused');
 
-    for (const { field, next } of renderAffectingChanges) {
+    for (const [field, value] of renderAffectingEntries) {
+      const next = {
+        ...base,
+        [field]: changedRenderSettingValue(field as keyof RenderSettings, value),
+      };
+
       expect(shouldResetAccumulation(base, next), field).toBe(true);
     }
   });
@@ -129,3 +138,15 @@ describe('render settings', () => {
     expect(shouldResetAccumulation(base, changedPaused)).toBe(false);
   });
 });
+
+function changedRenderSettingValue(field: keyof RenderSettings, value: RenderSettings[keyof RenderSettings]) {
+  if (field === 'presetId') {
+    return BOOK_QUALITY_PRESET.id;
+  }
+
+  if (typeof value === 'number') {
+    return value === 1 ? 2 : value - 1;
+  }
+
+  return value;
+}

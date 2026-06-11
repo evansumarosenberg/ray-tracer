@@ -4,7 +4,7 @@ export const MIN_RESOLUTION_SCALE = 0.1;
 export const MAX_RESOLUTION_SCALE = 1;
 export const MAX_RENDER_DIMENSION = 16_384;
 export const MAX_SAMPLES_PER_PIXEL = 500;
-export const MAX_MAX_DEPTH = 50;
+export const MAX_RENDER_DEPTH = 50;
 
 export interface RenderSize {
   width: number;
@@ -43,7 +43,7 @@ export function createRenderSettings(
   const maxDepth = clampDimensionToRange(
     Math.floor(finiteOrFallback(overrides.maxDepth, preset.maxDepth)),
     1,
-    MAX_MAX_DEPTH,
+    MAX_RENDER_DEPTH,
   );
 
   return {
@@ -58,14 +58,9 @@ export function createRenderSettings(
 }
 
 export function shouldResetAccumulation(previous: RenderSettings, next: RenderSettings): boolean {
-  return (
-    previous.presetId !== next.presetId ||
-    previous.aspectRatio !== next.aspectRatio ||
-    previous.imageWidth !== next.imageWidth ||
-    previous.resolutionScale !== next.resolutionScale ||
-    previous.samplesPerPixel !== next.samplesPerPixel ||
-    previous.maxDepth !== next.maxDepth
-  );
+  const { paused: _previousPaused, ...previousRenderState } = previous;
+  const { paused: _nextPaused, ...nextRenderState } = next;
+  return !shallowEqual(previousRenderState, nextRenderState);
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -90,4 +85,11 @@ function clampDimension(value: number): number {
 
 function clampDimensionToRange(value: number, min: number, max: number): number {
   return Math.floor(clamp(finiteOrFallback(value, min), min, max));
+}
+
+function shallowEqual<T extends object>(a: T, b: T): boolean {
+  const aKeys = Object.keys(a) as Array<keyof T>;
+  const bKeys = Object.keys(b) as Array<keyof T>;
+
+  return aKeys.length === bKeys.length && aKeys.every((key) => Object.is(a[key], b[key]));
 }
