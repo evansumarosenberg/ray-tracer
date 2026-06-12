@@ -7,6 +7,8 @@ This project adapts the book's CPU renderer into a TypeScript + Vite app that ru
 progressively in raw WebGL2. The scene is generated deterministically on the CPU, packed into GPU
 textures, and rendered with handwritten GLSL shaders.
 
+A live browser demo is available on [GitHub Pages](https://evansumarosenberg.github.io/ray-tracer/).
+
 ## Features
 
 - Progressive WebGL2 path tracing with accumulation over many samples.
